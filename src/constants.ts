@@ -10,6 +10,8 @@ export const DEFAULT_FAVORITE_RELAYS = [
   'wss://news.utxo.one/'
 ]
 
+export const RECOMMENDED_RELAYS = DEFAULT_FAVORITE_RELAYS.concat(['wss://yabu.me/'])
+
 export const StorageKey = {
   VERSION: 'version',
   THEME_SETTING: 'themeSetting',
