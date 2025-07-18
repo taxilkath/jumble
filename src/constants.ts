@@ -12,6 +12,8 @@ export const DEFAULT_FAVORITE_RELAYS = [
 
 export const RECOMMENDED_RELAYS = DEFAULT_FAVORITE_RELAYS.concat(['wss://yabu.me/'])
 
+export const RECOMMENDED_BLOSSOM_SERVERS = ['https://blossom.band/', 'https://nostr.download/']
+
 export const StorageKey = {
   VERSION: 'version',
   THEME_SETTING: 'themeSetting',
@@ -26,12 +28,13 @@ export const StorageKey = {
   QUICK_ZAP: 'quickZap',
   LAST_READ_NOTIFICATION_TIME_MAP: 'lastReadNotificationTimeMap',
   ACCOUNT_FEED_INFO_MAP: 'accountFeedInfoMap',
-  MEDIA_UPLOAD_SERVICE: 'mediaUploadService',
   AUTOPLAY: 'autoplay',
   HIDE_UNTRUSTED_INTERACTIONS: 'hideUntrustedInteractions',
   HIDE_UNTRUSTED_NOTIFICATIONS: 'hideUntrustedNotifications',
   TRANSLATION_SERVICE_CONFIG_MAP: 'translationServiceConfigMap',
+  MEDIA_UPLOAD_SERVICE_CONFIG_MAP: 'mediaUploadServiceConfigMap',
   HIDE_UNTRUSTED_NOTES: 'hideUntrustedNotes',
+  MEDIA_UPLOAD_SERVICE: 'mediaUploadService', // deprecated
   HIDE_UNTRUSTED_EVENTS: 'hideUntrustedEvents', // deprecated
   ACCOUNT_RELAY_LIST_EVENT_MAP: 'accountRelayListEventMap', // deprecated
   ACCOUNT_FOLLOW_LIST_EVENT_MAP: 'accountFollowListEventMap', // deprecated
@@ -59,8 +62,9 @@ export const GROUP_METADATA_EVENT_KIND = 39000
 
 export const ExtendedKind = {
   PICTURE: 20,
-  FAVORITE_RELAYS: 10012,
   COMMENT: 1111,
+  FAVORITE_RELAYS: 10012,
+  BLOSSOM_SERVER_LIST: 10063,
   GROUP_METADATA: 39000
 }
 
