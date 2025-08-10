@@ -5,6 +5,11 @@ import { z } from 'zod'
 import client from './client.service'
 import storage from './local-storage.service'
 
+type UploadOptions = {
+  onProgress?: (progressPercent: number) => void
+  signal?: AbortSignal
+}
+
 class MediaUploadService {
   static instance: MediaUploadService
 
@@ -23,12 +28,12 @@ class MediaUploadService {
     this.serviceConfig = config
   }
 
-  async upload(file: File) {
+  async upload(file: File, options?: UploadOptions) {
     let result: { url: string; tags: string[][] }
     if (this.serviceConfig.type === 'nip96') {
-      result = await this.uploadByNip96(this.serviceConfig.service, file)
+      result = await this.uploadByNip96(this.serviceConfig.service, file, options)
     } else {
-      result = await this.uploadByBlossom(file)
+      result = await this.uploadByBlossom(file, options)
     }
 
     if (result.tags.length > 0) {
@@ -37,7 +42,7 @@ class MediaUploadService {
     return result
   }
 
-  private async uploadByBlossom(file: File) {
+  private async uploadByBlossom(file: File, options?: UploadOptions) {
     const pubkey = client.pubkey
     const signer = async (draft: TDraftEvent) => {
       if (!client.signer) {
@@ -48,6 +53,12 @@ class MediaUploadService {
     if (!pubkey) {
       throw new Error('You need to be logged in to upload media')
     }
+
+    if (options?.signal?.aborted) {
+      throw new Error('Upload aborted')
+    }
+
+    options?.onProgress?.(0)
 
     const servers = await client.fetchBlossomServerList(pubkey)
     if (servers.length === 0) {
@@ -74,10 +85,11 @@ class MediaUploadService {
       tags = parseResult.data
     }
 
+    options?.onProgress?.(100)
     return { url: blob.url, tags }
   }
 
-  private async uploadByNip96(service: string, file: File) {
+  private async uploadByNip96(service: string, file: File, options?: UploadOptions) {
     let uploadUrl = this.nip96ServiceUploadUrlMap.get(service)
     if (!uploadUrl) {
       const response = await fetch(`${service}/.well-known/nostr/nip96.json`)
@@ -100,26 +112,58 @@ class MediaUploadService {
     formData.append('file', file)
 
     const auth = await client.signHttpAuth(uploadUrl, 'POST', 'Uploading media file')
-    const response = await fetch(uploadUrl, {
-      method: 'POST',
-      body: formData,
-      headers: {
-        Authorization: auth
+
+    // Use XMLHttpRequest for upload progress support
+    const result = await new Promise<{ url: string; tags: string[][] }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', uploadUrl as string)
+      xhr.responseType = 'json'
+      xhr.setRequestHeader('Authorization', auth)
+
+      const handleAbort = () => {
+        try {
+          xhr.abort()
+        } catch (_) {
+          // ignore
+        }
+        reject(new Error('Upload aborted'))
       }
+      if (options?.signal) {
+        if (options.signal.aborted) {
+          return handleAbort()
+        }
+        options.signal.addEventListener('abort', handleAbort, { once: true })
+      }
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100)
+          options?.onProgress?.(percent)
+        }
+      }
+      xhr.onerror = () => reject(new Error('Network error'))
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const data = xhr.response
+          try {
+            const tags = z.array(z.array(z.string())).parse(data?.nip94_event?.tags ?? [])
+            const url = tags.find(([tagName]: string[]) => tagName === 'url')?.[1]
+            if (url) {
+              resolve({ url, tags })
+            } else {
+              reject(new Error('No url found'))
+            }
+          } catch (e) {
+            reject(e as Error)
+          }
+        } else {
+          reject(new Error(xhr.status.toString() + ' ' + xhr.statusText))
+        }
+      }
+      xhr.send(formData)
     })
 
-    if (!response.ok) {
-      throw new Error(response.status.toString() + ' ' + response.statusText)
-    }
-
-    const data = await response.json()
-    const tags = z.array(z.array(z.string())).parse(data.nip94_event?.tags ?? [])
-    const url = tags.find(([tagName]) => tagName === 'url')?.[1]
-    if (url) {
-      return { url, tags }
-    } else {
-      throw new Error('No url found')
-    }
+    return result
   }
 
   getImetaTagByUrl(url: string) {
