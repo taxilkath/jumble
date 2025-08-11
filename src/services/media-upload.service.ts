@@ -60,6 +60,28 @@ class MediaUploadService {
 
     options?.onProgress?.(0)
 
+    // Pseudo-progress: advance gradually until main upload completes
+    let pseudoProgress = 1
+    let pseudoTimer: number | undefined
+    const startPseudoProgress = () => {
+      if (pseudoTimer !== undefined) return
+      pseudoTimer = window.setInterval(() => {
+        // Cap pseudo progress to 90% until we get real completion
+        pseudoProgress = Math.min(pseudoProgress + 3, 90)
+        options?.onProgress?.(pseudoProgress)
+        if (pseudoProgress >= 90) {
+          stopPseudoProgress()
+        }
+      }, 300)
+    }
+    const stopPseudoProgress = () => {
+      if (pseudoTimer !== undefined) {
+        clearInterval(pseudoTimer)
+        pseudoTimer = undefined
+      }
+    }
+    startPseudoProgress()
+
     const servers = await client.fetchBlossomServerList(pubkey)
     if (servers.length === 0) {
       throw new Error('No Blossom services available')
@@ -72,6 +94,9 @@ class MediaUploadService {
 
     // first upload blob to main server
     const blob = await BlossomClient.uploadBlob(mainServer, file, { auth })
+    // Main upload finished
+    stopPseudoProgress()
+    options?.onProgress?.(80)
 
     if (mirrorServers.length > 0) {
       await Promise.allSettled(

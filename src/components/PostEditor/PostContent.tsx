@@ -178,6 +178,17 @@ export default function PostContent({
         parentEvent={parentEvent}
         onSubmit={() => post()}
         className={isPoll ? 'min-h-20' : 'min-h-52'}
+        onUploadStart={(file) => {
+          setUploadFileName(file.name)
+          setUploadProgress(0)
+        }}
+        onUploadProgress={(p) => setUploadProgress(p)}
+        onUploadEnd={() => {
+          setUploadProgress(null)
+          setUploadFileName(null)
+          cancelRef.current = null
+        }}
+        onProvideCancel={(cancel) => (cancelRef.current = cancel)}
       />
       {isPoll && (
         <PollEditor
